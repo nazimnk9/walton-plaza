@@ -1,4 +1,4 @@
-import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink, gql } from '@apollo/client';
 import { GetProductsResponse, GetProductsVariables } from './types';
 import { GET_PRODUCTS_QUERY } from './queries';
 
@@ -24,8 +24,9 @@ export const getApolloClient = () => {
 };
 
 /**
- * Ultra-high-performance server-side GraphQL fetcher.
- * Leverages native Next.js fetch cache, request memoization, and is 100% server-side (zero bundle size).
+ * Ultra-high-performance server-side GraphQL fetcher using Apollo Client.
+ * Leverages native Next.js fetch cache, request memoization, and utilizes
+ * Apollo's normalized query checks.
  */
 export async function serverFetchGraphQL<T = GetProductsResponse>(
   query: string,
@@ -33,46 +34,38 @@ export async function serverFetchGraphQL<T = GetProductsResponse>(
   options: RequestInit = {}
 ): Promise<{ data: T | null; error: string | null }> {
   try {
-    const res = await fetch(GRAPHQL_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
+    const client = getApolloClient();
+
+    // Run query through Apollo Client's querying mechanism.
+    // Passes Next.js revalidation configs dynamically in the fetch link options.
+    const result = await client.query<T>({
+      query: gql`${query}`,
+      variables: variables as any,
+      context: {
+        fetchOptions: {
+          next: {
+            revalidate: 60, // Revalidate every 60 seconds
+            ...options.next,
+          },
+          cache: options.cache,
+        },
       },
-      body: JSON.stringify({
-        query,
-        variables,
-      }),
-      // Use Next.js native fetch cache config
-      next: {
-        revalidate: 60, // Revalidate every 60 seconds
-        ...options.next,
-      },
-      cache: options.cache,
+      fetchPolicy: 'no-cache', // Prevents server cache cross-request leaks
     });
 
-    if (!res.ok) {
+    if (result.error) {
       return {
         data: null,
-        error: `HTTP error! Status: ${res.status}`,
-      };
-    }
-
-    const json = await res.json();
-
-    if (json.errors && json.errors.length > 0) {
-      return {
-        data: null,
-        error: json.errors[0].message || 'GraphQL Query Error',
+        error: result.error.message || 'GraphQL Query Error',
       };
     }
 
     return {
-      data: json.data as T,
+      data: result.data as T,
       error: null,
     };
   } catch (err) {
-    console.error('GraphQL Fetch Error:', err);
+    console.error('GraphQL Apollo Fetch Error:', err);
     return {
       data: null,
       error: err instanceof Error ? err.message : 'Unknown network error',
@@ -87,9 +80,25 @@ export async function serverGetProducts(
   variables: GetProductsVariables = {},
   options: RequestInit = {}
 ) {
+  // Sanitize filters to avoid sending 'undefined' fields to GraphQL
+  const filter = variables.filter || {};
+  const sanitizedFilter = {
+    isActive: typeof filter.isActive === 'boolean' ? filter.isActive : true,
+    uid: filter.uid !== undefined ? filter.uid : null,
+    posItemCode: filter.posItemCode !== undefined ? filter.posItemCode : null,
+  };
+
+  const sanitizedVariables: GetProductsVariables = {
+    pagination: {
+      skip: variables.pagination?.skip ?? 0,
+      limit: variables.pagination?.limit ?? 100,
+    },
+    filter: sanitizedFilter,
+  };
+
   const result = await serverFetchGraphQL<GetProductsResponse>(
     GET_PRODUCTS_QUERY,
-    variables,
+    sanitizedVariables,
     options
   );
 
