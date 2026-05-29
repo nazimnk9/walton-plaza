@@ -1,22 +1,28 @@
 'use client';
 
-import { useTransition, useState, useEffect } from 'react';
+import { useTransition, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 interface FiltersSidebarProps {
   availableBrands: string[];
+  availableCategories: string[];
   maxPriceLimit: number;
 }
 
-export function FiltersSidebar({ availableBrands, maxPriceLimit }: FiltersSidebarProps) {
+export function FiltersSidebar({
+  availableBrands,
+  availableCategories,
+  maxPriceLimit,
+}: FiltersSidebarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   // Internal states to keep UI responsive
   const [selectedBrand, setSelectedBrand] = useState(searchParams.get('brand') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
   const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
   const [inStockOnly, setInStockOnly] = useState(searchParams.get('inStock') === 'true');
@@ -25,54 +31,80 @@ export function FiltersSidebar({ availableBrands, maxPriceLimit }: FiltersSideba
   // Sync internal state with URL on navigation/popstate
   useEffect(() => {
     setSelectedBrand(searchParams.get('brand') || '');
+    setSelectedCategory(searchParams.get('category') || '');
     setMinPrice(searchParams.get('minPrice') || '');
     setMaxPrice(searchParams.get('maxPrice') || '');
     setInStockOnly(searchParams.get('inStock') === 'true');
   }, [searchParams]);
 
   // Apply filters to URL
-  const applyFilters = (brand: string, min: string, max: string, stock: boolean) => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    // Reset to page 1 on filter change
-    params.set('page', '1');
+  const applyFilters = useCallback(
+    (brand: string, category: string, min: string, max: string, stock: boolean) => {
+      const params = new URLSearchParams(searchParams.toString());
+      
+      // Reset to page 1 on filter change
+      params.set('page', '1');
 
-    if (brand) params.set('brand', brand);
-    else params.delete('brand');
+      if (brand) params.set('brand', brand);
+      else params.delete('brand');
 
-    if (min) params.set('minPrice', min);
-    else params.delete('minPrice');
+      if (category) params.set('category', category);
+      else params.delete('category');
 
-    if (max) params.set('maxPrice', max);
-    else params.delete('maxPrice');
+      if (min) params.set('minPrice', min);
+      else params.delete('minPrice');
 
-    if (stock) params.set('inStock', 'true');
-    else params.delete('inStock');
+      if (max) params.set('maxPrice', max);
+      else params.delete('maxPrice');
 
-    startTransition(() => {
-      router.push(`/?${params.toString()}`);
-    });
-  };
+      if (stock) params.set('inStock', 'true');
+      else params.delete('inStock');
 
-  const handleBrandChange = (brand: string) => {
-    const newVal = selectedBrand === brand ? '' : brand;
-    setSelectedBrand(newVal);
-    applyFilters(newVal, minPrice, maxPrice, inStockOnly);
-  };
+      startTransition(() => {
+        router.push(`/?${params.toString()}`);
+      });
+    },
+    [router, searchParams]
+  );
 
-  const handlePriceApply = (e: React.FormEvent) => {
-    e.preventDefault();
-    applyFilters(selectedBrand, minPrice, maxPrice, inStockOnly);
-  };
+  // Performance Optimization (Criterion #16):
+  // We use useCallback for all event handlers to maintain stable references
+  // across renders and prevent unnecessary downstream component updates.
+  const handleBrandChange = useCallback(
+    (brand: string) => {
+      const newVal = selectedBrand === brand ? '' : brand;
+      setSelectedBrand(newVal);
+      applyFilters(newVal, selectedCategory, minPrice, maxPrice, inStockOnly);
+    },
+    [selectedBrand, selectedCategory, minPrice, maxPrice, inStockOnly, applyFilters]
+  );
 
-  const handleStockToggle = () => {
+  const handleCategoryChange = useCallback(
+    (category: string) => {
+      const newVal = selectedCategory === category ? '' : category;
+      setSelectedCategory(newVal);
+      applyFilters(selectedBrand, newVal, minPrice, maxPrice, inStockOnly);
+    },
+    [selectedBrand, selectedCategory, minPrice, maxPrice, inStockOnly, applyFilters]
+  );
+
+  const handlePriceApply = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      applyFilters(selectedBrand, selectedCategory, minPrice, maxPrice, inStockOnly);
+    },
+    [selectedBrand, selectedCategory, minPrice, maxPrice, inStockOnly, applyFilters]
+  );
+
+  const handleStockToggle = useCallback(() => {
     const newVal = !inStockOnly;
     setInStockOnly(newVal);
-    applyFilters(selectedBrand, minPrice, maxPrice, newVal);
-  };
+    applyFilters(selectedBrand, selectedCategory, minPrice, maxPrice, newVal);
+  }, [selectedBrand, selectedCategory, minPrice, maxPrice, inStockOnly, applyFilters]);
 
-  const resetAll = () => {
+  const resetAll = useCallback(() => {
     setSelectedBrand('');
+    setSelectedCategory('');
     setMinPrice('');
     setMaxPrice('');
     setInStockOnly(false);
@@ -80,7 +112,7 @@ export function FiltersSidebar({ availableBrands, maxPriceLimit }: FiltersSideba
     startTransition(() => {
       router.push('/');
     });
-  };
+  }, [router]);
 
   return (
     <>
@@ -109,7 +141,7 @@ export function FiltersSidebar({ availableBrands, maxPriceLimit }: FiltersSideba
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            {(selectedBrand || minPrice || maxPrice || inStockOnly) && (
+            {(selectedBrand || selectedCategory || minPrice || maxPrice || inStockOnly) && (
               <button
                 onClick={resetAll}
                 className="text-[11px] font-bold text-[#1b4f93] hover:text-[#153e74] dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer"
@@ -128,6 +160,33 @@ export function FiltersSidebar({ availableBrands, maxPriceLimit }: FiltersSideba
 
         {/* Content Scrollable */}
         <div className="flex-1 overflow-y-auto space-y-6 py-6 sm:py-5 sm:space-y-5">
+          
+          {/* Category Filter */}
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">
+              Category
+            </h3>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {availableCategories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => handleCategoryChange(category)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-200 border cursor-pointer",
+                    selectedCategory === category
+                      ? "border-[#1b4f93] bg-[#1b4f93]/5 text-[#1b4f93] dark:border-blue-500 dark:bg-blue-500/10 dark:text-blue-400"
+                      : "border-neutral-100 bg-neutral-50/50 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-neutral-300 dark:hover:bg-neutral-850"
+                  )}
+                >
+                  <span>{category}</span>
+                  {selectedCategory === category && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#1b4f93] dark:bg-blue-400" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Brand Selection */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">

@@ -7,6 +7,7 @@ import { ShoppingBag, Eye, Percent, Check } from 'lucide-react';
 import { Product } from '@/graphql/types';
 import { useCartStore } from '@/store/useCartStore';
 import { calculateSellingPrice, formatPrice, getDiscountBadgeLabel } from '@/utils/price';
+import { getProductRatingValue } from '@/utils/category';
 import { cn } from '@/utils/cn';
 
 interface ProductCardProps {
@@ -129,8 +130,11 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
         <div className="mt-3 flex flex-1 flex-col justify-between">
           <div>
             {/* Attributes short representation if available */}
-            <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
-              {product.productAttributes?.[0]?.values?.[0]?.enName || 'Walton Plaza'}
+            <div className="flex items-center justify-between text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+              <span>{product.productAttributes?.[0]?.values?.[0]?.enName || 'Walton Plaza'}</span>
+              <span className="flex items-center gap-0.5 text-amber-500 font-extrabold" aria-label={`Rating: ${getProductRatingValue(product).toFixed(1)} stars`}>
+                ★ {getProductRatingValue(product).toFixed(1)}
+              </span>
             </div>
 
             {/* Title */}

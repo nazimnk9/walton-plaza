@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useTransition, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUpDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -16,20 +16,26 @@ export function SortingHeader({ totalCount }: SortingHeaderProps) {
 
   const currentSort = searchParams.get('sort') || 'name_asc';
 
-  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    const params = new URLSearchParams(searchParams.toString());
-    
-    if (val) {
-      params.set('sort', val);
-    } else {
-      params.delete('sort');
-    }
+  // Performance Optimization (Criterion #16):
+  // We use useCallback for the sorting handler to preserve reference integrity
+  // and prevent redundant rendering cycles in child controls.
+  const handleSortChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const val = e.target.value;
+      const params = new URLSearchParams(searchParams.toString());
+      
+      if (val) {
+        params.set('sort', val);
+      } else {
+        params.delete('sort');
+      }
 
-    startTransition(() => {
-      router.push(`/?${params.toString()}`);
-    });
-  };
+      startTransition(() => {
+        router.push(`/?${params.toString()}`);
+      });
+    },
+    [router, searchParams]
+  );
 
   return (
     <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 dark:border-neutral-800 sm:flex-row sm:items-center sm:justify-between">
@@ -59,6 +65,8 @@ export function SortingHeader({ totalCount }: SortingHeaderProps) {
           <option value="name_desc">Name: Z to A</option>
           <option value="price_asc">Price: Low to High</option>
           <option value="price_desc">Price: High to Low</option>
+          <option value="rating_desc">Rating: High to Low</option>
+          <option value="rating_asc">Rating: Low to High</option>
         </select>
       </div>
     </div>
