@@ -4,6 +4,12 @@ This repository contains a high-performance storefront designed for **Walton Pla
 
 ---
 
+## 📝 Architectural Justifications
+
+For an in-depth architectural breakdown and staffing justifications of our engineering trade-offs (including Pagination vs. Infinite Scroll, Zustand Cart Persistence, Apollo Normalized Caching, and React 19 Memoization Strategies), please read the [Architectural Justifications & Design Strategy](file:walton-plaza/docs/justifications.md) document.
+
+---
+
 ## 🏛️ Client vs. Server Components (RSC Architecture)
 
 Next.js App Router enforces a hybrid server-first boundary which we have utilized to optimize load-times, reduce initial JavaScript size, and maximize SEO:
