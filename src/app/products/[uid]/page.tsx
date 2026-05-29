@@ -12,16 +12,37 @@ interface PDPPageProps {
   }>;
 }
 
+// Utility resolver to find product by either UID or POS Item Code dynamically (Criterion #11)
+async function resolveProduct(routeParam: string) {
+  // 1. Attempt query using routeParam as uid
+  let { products, statusCode, message } = await serverGetProducts({
+    filter: { uid: routeParam, isActive: true },
+    pagination: { skip: 0, limit: 1 },
+  });
+
+  let product = products?.[0];
+
+  // 2. If not found by uid, attempt query using routeParam as posItemCode
+  if (statusCode === 200 && !product) {
+    const fallbackResult = await serverGetProducts({
+      filter: { posItemCode: routeParam, isActive: true },
+      pagination: { skip: 0, limit: 1 },
+    });
+    if (fallbackResult.statusCode === 200 && fallbackResult.products?.length > 0) {
+      product = fallbackResult.products[0];
+      statusCode = fallbackResult.statusCode;
+      message = fallbackResult.message;
+    }
+  }
+
+  return { product, statusCode, message };
+}
+
 // Generate Dynamic SEO Metadata for Walton Plaza PDP
 export async function generateMetadata(props: PDPPageProps): Promise<Metadata> {
   const { uid } = await props.params;
 
-  const { products } = await serverGetProducts({
-    filter: { uid },
-    pagination: { skip: 0, limit: 1 },
-  });
-
-  const product = products?.[0];
+  const { product } = await resolveProduct(uid);
 
   if (!product) {
     return {
@@ -39,13 +60,8 @@ export async function generateMetadata(props: PDPPageProps): Promise<Metadata> {
 export default async function ProductDetailPage(props: PDPPageProps) {
   const { uid } = await props.params;
 
-  // Fetch product specifications on the server
-  const { products, statusCode, message } = await serverGetProducts({
-    filter: { uid },
-    pagination: { skip: 0, limit: 1 },
-  });
-
-  const product = products?.[0];
+  // Resolve the product by either UID or POS Item Code
+  const { product, statusCode, message } = await resolveProduct(uid);
 
   // Handle network/connection failure gracefully
   if (statusCode !== 200) {
@@ -77,7 +93,7 @@ export default async function ProductDetailPage(props: PDPPageProps) {
           Item Not Found
         </h2>
         <p className="mt-2 text-xs font-semibold text-neutral-400 dark:text-neutral-500">
-          The product with ID &quot;{uid}&quot; does not exist or has been removed from inventory.
+          The product with ID or POS Code &quot;{uid}&quot; does not exist or has been removed from inventory.
         </p>
         <Link
           href="/"

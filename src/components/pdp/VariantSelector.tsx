@@ -5,6 +5,7 @@ import { ShoppingBag, Check, Info, ShieldCheck, Truck } from 'lucide-react';
 import { Product, ProductVariant } from '@/graphql/types';
 import { useCartStore } from '@/store/useCartStore';
 import { calculateSellingPrice, formatPrice, getDiscountBadgeLabel, calculateSavings } from '@/utils/price';
+import { getVariantLabel } from '@/utils/category';
 import { cn } from '@/utils/cn';
 
 interface VariantSelectorProps {
@@ -132,7 +133,7 @@ export function VariantSelector({ product }: VariantSelectorProps) {
                   onClick={() => setSelectedIdx(idx)}
                   role="tab"
                   aria-selected={isSelected}
-                  aria-label={`Option ${idx + 1}: code ${v.posItemCode}, price ${formatPrice(vPrice)}, ${vOutOfStock ? 'Sold Out' : 'In stock'}`}
+                  aria-label={`Variant ${getVariantLabel(v, product, idx)}: code ${v.posItemCode}, price ${formatPrice(vPrice)}, ${vOutOfStock ? 'Sold Out' : 'In stock'}`}
                   className={cn(
                     "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all duration-200 hover:scale-[1.02] active:scale-98 min-w-[120px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[#1b4f93] cursor-pointer",
                     isSelected
@@ -140,8 +141,8 @@ export function VariantSelector({ product }: VariantSelectorProps) {
                       : "border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
                   )}
                 >
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">
-                    Opt {idx + 1}
+                  <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase">
+                    {getVariantLabel(v, product, idx)}
                   </span>
                   <span className="text-xs font-black text-neutral-800 dark:text-white mt-0.5">
                     {formatPrice(vPrice)}

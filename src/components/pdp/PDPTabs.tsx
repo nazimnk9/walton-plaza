@@ -12,9 +12,7 @@ interface PDPTabsProps {
 type TabKey = 'attributes' | 'descriptions' | 'deliveries' | 'service' | 'priceStocks';
 
 export function PDPTabs({ product }: PDPTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('attributes');
-
-  // Verify and only display tabs that actually have metadata to show.
+  // Define all possible tabs
   const tabs = [
     {
       key: 'attributes' as TabKey,
@@ -48,33 +46,46 @@ export function PDPTabs({ product }: PDPTabsProps) {
     },
   ];
 
+  // Dynamic filter: Keep only tabs that actually have metadata (Criterion #12)
+  const visibleTabs = tabs.filter((t) => t.items && t.items.length > 0);
+
+  // Set initial active tab dynamically to the first tab with data
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    return visibleTabs[0]?.key || 'attributes';
+  });
+
+  // Handle completely empty details block gracefully
+  if (visibleTabs.length === 0) {
+    return (
+      <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 text-center py-10">
+        <p className="text-sm font-semibold text-neutral-400 dark:text-neutral-500">
+          No detailed specifications or descriptions found for this product.
+        </p>
+      </div>
+    );
+  }
+
   // Active tab detail
-  const currentTab = tabs.find((t) => t.key === activeTab)!;
+  const currentTab = visibleTabs.find((t) => t.key === activeTab) || visibleTabs[0];
 
   return (
     <div className="space-y-6">
       {/* Tabs list */}
       <div className="flex border-b border-neutral-100 overflow-x-auto scrollbar-none dark:border-neutral-800">
         <div className="flex gap-1.5 pb-0.5">
-          {tabs.map((tab) => {
-            const hasData = tab.items && tab.items.length > 0;
-
+          {visibleTabs.map((tab) => {
             return (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  "relative whitespace-nowrap rounded-t-xl px-4 py-3 text-xs font-black transition-all duration-200 border-b-2 -mb-[2px] active:scale-95",
+                  "relative whitespace-nowrap rounded-t-xl px-4 py-3 text-xs font-black transition-all duration-200 border-b-2 -mb-[2px] active:scale-95 cursor-pointer",
                   activeTab === tab.key
                     ? "border-[#1b4f93] text-[#1b4f93] dark:border-blue-500 dark:text-blue-400"
-                    : "border-transparent text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300",
-                  !hasData && "opacity-45 hover:opacity-100" // visually distinguish empty sections
+                    : "border-transparent text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
                 )}
               >
                 {tab.label}
-                {!hasData && (
-                  <span className="ml-1 text-[9px] font-bold text-neutral-400">(N/A)</span>
-                )}
               </button>
             );
           })}
