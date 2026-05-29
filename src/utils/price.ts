@@ -10,7 +10,7 @@ export function calculateSellingPrice(variant: ProductVariant): number {
   if (!discount) return mrpPrice;
 
   // Use discount.value directly as specified in the API documentation
-  if (typeof discount.value === 'number' && discount.value > 0) {
+  if (typeof discount.value === 'number' && discount.value >= 0) {
     return discount.value;
   }
 
