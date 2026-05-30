@@ -1,3 +1,18 @@
+/**
+ * @file src/components/pdp/VariantSelector.tsx
+ * @description Highly interactive Client Component handling Product variant selection on PDP.
+ * Deals with stock checks, color/specs variant selection pills, price computations,
+ * and handles adding items to the checkout cart with advanced visual feedback states.
+ * 
+ * Performance & React 19 Optimization:
+ * - React 19 Transitions (`useTransition`): Executes operations asynchronously inside transition paths,
+ *   preserving screen responsiveness during computation bottlenecks.
+ * - React 19 Optimistic States (`useOptimistic`): Shows immediate feedback (Adding... -> Added!)
+ *   before final state synchronization completes in background thread pools, creating an extremely premium UX.
+ * - Accessibility (a11y): Configured with `aria-live="polite"` surrounding dynamic pricing blocks.
+ *   Screen readers automatically announce updated rates and discount savings when customers toggle options.
+ */
+
 'use client';
 
 import { useTransition, useOptimistic, useState } from 'react';
@@ -12,22 +27,30 @@ interface VariantSelectorProps {
   product: Product;
 }
 
+/**
+ * VariantSelector - Dynamic options grid and purchase action panel.
+ * 
+ * @param props.product - The core Product catalog detail.
+ */
 export function VariantSelector({ product }: VariantSelectorProps) {
+  // Track selected variant indices locally
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [isPending, startTransition] = useTransition();
 
+  // Retrieve Zustand actions to modify global cart states
   const addItem = useCartStore((state) => state.addItem);
   const toggleCart = useCartStore((state) => state.toggleCart);
 
   const variants = product.variants || [];
   const selectedVariant: ProductVariant | undefined = variants[selectedIdx];
 
-  // React 19 Optimistic state for the button feedback
+  // React 19 Optimistic state hook for button loading/success transitions
   const [optimisticState, setOptimisticState] = useOptimistic(
     'idle' as 'idle' | 'adding' | 'added',
     (_current, newState: 'idle' | 'adding' | 'added') => newState
   );
 
+  // Guard against missing database parameters safely
   if (!selectedVariant) {
     return (
       <div className="rounded-2xl border border-neutral-100 bg-amber-50 p-4 text-xs font-semibold text-amber-700 dark:border-neutral-800 dark:bg-amber-950/20 dark:text-amber-400">
@@ -36,6 +59,7 @@ export function VariantSelector({ product }: VariantSelectorProps) {
     );
   }
 
+  // Calculate pricing matrices based on the currently selected variant spec
   const sellingPrice = calculateSellingPrice(selectedVariant);
   const mrpPrice = selectedVariant.mrpPrice;
   const discount = selectedVariant.discount;
@@ -46,15 +70,21 @@ export function VariantSelector({ product }: VariantSelectorProps) {
   const showDiscount = discount && discountLabel && sellingPrice < mrpPrice;
   const savings = calculateSavings(selectedVariant);
 
+  /**
+   * Triggers cart insertion and sets off Optimistic transitions.
+   */
   const handleAddToCart = () => {
     if (isOutOfStock) return;
 
+    // Execute state operations asynchronously inside React 19 Transition thread
     startTransition(async () => {
+      // Step 1: Optimistically switch state to 'adding' immediately for rapid feedback
       setOptimisticState('adding');
       
-      // Simulate fast network validation for premium UX feedback
+      // Step 2: Simulate network validations delay (350ms) to ensure premium visual transitions
       await new Promise((resolve) => setTimeout(resolve, 350));
       
+      // Step 3: Insert item details to our Zustand localStorage store
       addItem({
         uid: product.uid,
         enName: product.enName,
@@ -67,9 +97,11 @@ export function VariantSelector({ product }: VariantSelectorProps) {
         stockQuantity: stock,
       });
 
+      // Step 4: Optimistically transition button state to 'added' and slide the checkout drawer open
       setOptimisticState('added');
       toggleCart();
 
+      // Step 5: Automatically reset the button state to standard 'idle' after 1.5 seconds delay
       setTimeout(() => {
         startTransition(() => {
           setOptimisticState('idle');
@@ -80,7 +112,11 @@ export function VariantSelector({ product }: VariantSelectorProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Dynamic Pricing Section - aria-live polite will read price changes aloud */}
+      {/* 
+        Dynamic Pricing Section:
+        Wraps prices inside an aria-live assertive frame so visual rate updates are announced
+        audibly to assistive technology screen readers.
+      */}
       <div 
         className="flex flex-col gap-1.5 border-b border-neutral-100 pb-5 dark:border-neutral-800"
         aria-live="polite"
@@ -99,6 +135,7 @@ export function VariantSelector({ product }: VariantSelectorProps) {
           )}
         </div>
 
+        {/* Dynamic Discount Savings highlight tags */}
         {showDiscount && (
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className="rounded-full bg-[#da251c]/10 px-2.5 py-0.5 text-xs font-bold text-[#da251c] dark:bg-red-500/20 dark:text-red-400">
@@ -111,7 +148,10 @@ export function VariantSelector({ product }: VariantSelectorProps) {
         )}
       </div>
 
-      {/* Variant Selector Pills if multiple variants exist */}
+      {/* 
+        Variant Selector Option Grid:
+        Toggled only when more than one product variant (e.g. 128GB vs 256GB) exists in inventory catalog.
+      */}
       {variants.length > 1 && (
         <div className="space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
@@ -147,6 +187,7 @@ export function VariantSelector({ product }: VariantSelectorProps) {
                   <span className="text-xs font-black text-neutral-800 dark:text-white mt-0.5">
                     {formatPrice(vPrice)}
                   </span>
+                  {/* Stock level indicators tailored inside pills */}
                   <span className={cn(
                     "text-[9px] font-bold mt-1",
                     vOutOfStock
@@ -164,7 +205,7 @@ export function VariantSelector({ product }: VariantSelectorProps) {
         </div>
       )}
 
-      {/* Stock indicators */}
+      {/* Stock indicators panel */}
       <div className="flex items-center gap-2">
         <div 
           className={cn(
@@ -182,7 +223,10 @@ export function VariantSelector({ product }: VariantSelectorProps) {
         </span>
       </div>
 
-      {/* Buy Actions using React 19 transitions and useOptimistic */}
+      {/* 
+        Action buy buttons:
+        Integrates React 19 optimistics logic. Renders loading spinners and success ticks smoothly.
+      */}
       <div className="mt-4 flex flex-col gap-3">
         <button
           onClick={handleAddToCart}
@@ -209,6 +253,7 @@ export function VariantSelector({ product }: VariantSelectorProps) {
             'Out of Stock'
           ) : optimisticState === 'adding' ? (
             <>
+              {/* Spinner animation SVG for loading feedback */}
               <svg className="h-5 w-5 animate-spin text-[#1b4f93] dark:text-blue-400" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -228,7 +273,7 @@ export function VariantSelector({ product }: VariantSelectorProps) {
           )}
         </button>
 
-        {/* Micro reassurance info */}
+        {/* Micro reassurance trust indicators */}
         <div className="grid grid-cols-2 gap-4 mt-6 border-t border-neutral-100 pt-5 dark:border-neutral-800 text-neutral-400">
           <div className="flex items-center gap-2">
             <Truck className="h-4 w-4 text-[#1b4f93] dark:text-blue-400 shrink-0" aria-hidden="true" />

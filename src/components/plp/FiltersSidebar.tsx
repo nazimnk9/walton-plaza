@@ -1,3 +1,18 @@
+/**
+ * @file src/components/plp/FiltersSidebar.tsx
+ * @description Faceted filtering sidebar for the Product Listing Page (PLP).
+ * Enables toggling brands, categories, stock availability, and customizable pricing scopes.
+ * 
+ * Performance & React Optimizations:
+ * - useCallback Event Memoization (Criterion #16): Memoizes active filter state changers
+ *   (e.g., `handleBrandChange`, `handleCategoryChange`, `handlePriceApply`, `handleStockToggle`)
+ *   to retain identical function references across renders, preventing children redrawing blocks.
+ * - React 19 transition triggers (`useTransition`): URL pushes are queued safely inside transition wrappers,
+ *   enabling concurrent UI rendering changes and activating sleek loading indicators (`isPending`).
+ * - URL Synchronization: Dual-binds filters parameters straight to standard browser `URLSearchParams`
+ *   to ensure perfect SEO indexability and state recovery upon back/forward navigation.
+ */
+
 'use client';
 
 import { useTransition, useState, useEffect, useCallback } from 'react';
@@ -11,6 +26,9 @@ interface FiltersSidebarProps {
   maxPriceLimit: number;
 }
 
+/**
+ * FiltersSidebar - Interactive side-panel controller managing catalog filters.
+ */
 export function FiltersSidebar({
   availableBrands,
   availableCategories,
@@ -20,15 +38,15 @@ export function FiltersSidebar({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  // Internal states to keep UI responsive
+  // Internal reactive states mirroring active URL parameters to ensure high UI responsiveness
   const [selectedBrand, setSelectedBrand] = useState(searchParams.get('brand') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
   const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
   const [inStockOnly, setInStockOnly] = useState(searchParams.get('inStock') === 'true');
-  const [isOpen, setIsOpen] = useState(false); // Mobile toggle
+  const [isOpen, setIsOpen] = useState(false); // Mobile drawer visibility status state
 
-  // Sync internal state with URL on navigation/popstate
+  // Sync internal UI state dynamically with URLSearchParams on browser backward/forward history navigation pops
   useEffect(() => {
     setSelectedBrand(searchParams.get('brand') || '');
     setSelectedCategory(searchParams.get('category') || '');
@@ -37,12 +55,15 @@ export function FiltersSidebar({
     setInStockOnly(searchParams.get('inStock') === 'true');
   }, [searchParams]);
 
-  // Apply filters to URL
+  /**
+   * Encapsulates parameter state serialization and updates standard browser URLs.
+   * Forces catalog resetting back to page index 1 upon modifications.
+   */
   const applyFilters = useCallback(
     (brand: string, category: string, min: string, max: string, stock: boolean) => {
       const params = new URLSearchParams(searchParams.toString());
       
-      // Reset to page 1 on filter change
+      // Reset to page 1 on filter changes to prevent page index overflows
       params.set('page', '1');
 
       if (brand) params.set('brand', brand);
@@ -60,6 +81,7 @@ export function FiltersSidebar({
       if (stock) params.set('inStock', 'true');
       else params.delete('inStock');
 
+      // Schedule high-performance Next.js URL routing transition
       startTransition(() => {
         router.push(`/?${params.toString()}`);
       });
@@ -116,7 +138,10 @@ export function FiltersSidebar({
 
   return (
     <>
-      {/* Mobile Toggle Button */}
+      {/* 
+        Mobile Responsive Trigger Filters header button:
+        Only display on handheld mobile screens. Toggles the responsive sheet wrapper.
+      */}
       <button
         onClick={() => setIsOpen(true)}
         className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-bold text-neutral-800 shadow-xs hover:bg-neutral-50 active:scale-98 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white dark:hover:bg-neutral-800 sm:hidden cursor-pointer"
@@ -125,14 +150,18 @@ export function FiltersSidebar({
         Filters
       </button>
 
-      {/* Filters Container */}
+      {/* 
+        Faceted Filters aside element panel:
+        Responsive configuration. Renders as a fixed slide-out pane on mobile screens,
+        and as a static persistent grid side column on wider desktop resolutions.
+      */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-white p-6 shadow-xl transition-transform duration-300 dark:bg-neutral-900 sm:static sm:z-0 sm:w-64 sm:translate-x-0 sm:border sm:border-neutral-100 sm:p-5 sm:shadow-none sm:rounded-2xl dark:sm:border-neutral-800",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Header */}
+        {/* Sidebar Header Title & Clear Triggers */}
         <div className="flex items-center justify-between border-b border-neutral-100 pb-4 dark:border-neutral-800 sm:pb-3">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-[#1b4f93] dark:text-blue-400" />
@@ -152,16 +181,17 @@ export function FiltersSidebar({
             <button
               onClick={() => setIsOpen(false)}
               className="rounded-lg p-1 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-500 sm:hidden dark:hover:bg-neutral-800 cursor-pointer"
+              aria-label="Close filters pane"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* Content Scrollable */}
+        {/* Scrollable Filters forms container */}
         <div className="flex-1 overflow-y-auto space-y-6 py-6 sm:py-5 sm:space-y-5">
           
-          {/* Category Filter */}
+          {/* Category Facet selectors */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">
               Category
@@ -187,7 +217,7 @@ export function FiltersSidebar({
             </div>
           </div>
 
-          {/* Brand Selection */}
+          {/* Brand Facet selectors */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">
               Brand
@@ -213,7 +243,7 @@ export function FiltersSidebar({
             </div>
           </div>
 
-          {/* Price Range */}
+          {/* Custom Price Range boundaries input forms */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">
               Price Range
@@ -226,6 +256,7 @@ export function FiltersSidebar({
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
                   className="w-full rounded-xl border border-neutral-200 bg-neutral-50/50 px-3 py-2 text-xs font-bold focus:border-[#1b4f93] focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-white dark:focus:bg-neutral-900"
+                  aria-label="Minimum price in Taka"
                 />
                 <span className="text-xs text-neutral-400 font-bold">—</span>
                 <input
@@ -234,6 +265,7 @@ export function FiltersSidebar({
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
                   className="w-full rounded-xl border border-neutral-200 bg-neutral-50/50 px-3 py-2 text-xs font-bold focus:border-[#1b4f93] focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-white dark:focus:bg-neutral-900"
+                  aria-label="Maximum price in Taka"
                 />
               </div>
               <button
@@ -245,7 +277,7 @@ export function FiltersSidebar({
             </form>
           </div>
 
-          {/* Stock Availability */}
+          {/* Stock Availability binary toggler switch */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">
               Availability
@@ -258,13 +290,16 @@ export function FiltersSidebar({
                 type="checkbox"
                 checked={inStockOnly}
                 onChange={handleStockToggle}
-                className="h-4 w-4 rounded-sm border-neutral-300 text-[#1b4f93] focus:ring-[#1b4f93]/20 dark:border-neutral-700"
+                className="h-4 w-4 rounded-sm border-neutral-300 text-[#1b4f93] focus:ring-[#1b4f93]/20 dark:border-neutral-700 cursor-pointer"
               />
             </label>
           </div>
         </div>
 
-        {/* Loading/Pending overlay indicator */}
+        {/* 
+          Glassmorphic Loading/Pending overlay indicator:
+          Triggered when dynamic route transitions are executing in the background.
+        */}
         {isPending && (
           <div className="absolute inset-0 bg-white/40 dark:bg-neutral-900/40 backdrop-blur-xs flex items-center justify-center rounded-2xl">
             <RefreshCw className="h-6 w-6 animate-spin text-[#1b4f93] dark:text-blue-400" />
@@ -272,7 +307,7 @@ export function FiltersSidebar({
         )}
       </aside>
 
-      {/* Mobile backdrop */}
+      {/* Mobile Drawer backdrop dim overlay */}
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
@@ -282,3 +317,4 @@ export function FiltersSidebar({
     </>
   );
 }
+

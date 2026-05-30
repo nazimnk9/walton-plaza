@@ -1,3 +1,18 @@
+/**
+ * @file src/components/plp/ProductCard.tsx
+ * @description Catalog Grid Product Card element.
+ * Renders individual product details (thumbnails, ratings, titles, dynamic discount savings badges).
+ * 
+ * Performance & React 19 optimizations:
+ * - React.memo boundary: Keeps catalog layouts incredibly fast. ProductCard represents the most
+ *   replicated component. Memoizing skips rendering unless its specific `product` properties update,
+ *   preserving crucial frames during faceted catalog filter swaps.
+ * - useOptimistic UI mutations: Tapping 'Add to Cart' provides instantaneous feedback ticks
+ *   before final updates complete on Zustand storage pools.
+ * - Image optimization: Leverages Next.js Image component with pre-computed sizes mapping rules,
+ *   eliminating cumulative layout shifts (CLS).
+ */
+
 'use client';
 
 import { useTransition, useOptimistic, memo } from 'react';
@@ -22,7 +37,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
   const addItem = useCartStore((state) => state.addItem);
   const toggleCart = useCartStore((state) => state.toggleCart);
 
-  // Default to first variant
+  // Default to the first available variant for grid preview details
   const defaultVariant = product.variants?.[0];
   const sellingPrice = defaultVariant ? calculateSellingPrice(defaultVariant) : 0;
   const mrpPrice = defaultVariant ? defaultVariant.mrpPrice : 0;
@@ -30,7 +45,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
   const stock = defaultVariant ? defaultVariant.quantity : 0;
   const isOutOfStock = stock <= 0;
 
-  // React 19 Optimistic state for the button feedback
+  // React 19 Optimistic state hook for button loading/success animations
   const [optimisticState, setOptimisticState] = useOptimistic(
     'idle' as 'idle' | 'adding' | 'added',
     (_current, newState: 'idle' | 'adding' | 'added') => newState
@@ -41,14 +56,17 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
 
   const imageUrl = product.images?.[0]?.url || fallbackImage;
 
+  /**
+   * Triggers cart insertion and sets off Optimistic transitions inside the grid card context.
+   */
   const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevents triggers from firing Link navigation anchors
     if (isOutOfStock || !defaultVariant) return;
 
     startTransition(async () => {
       setOptimisticState('adding');
       
-      // Simulate fast network validation for premium UX feedback
+      // Simulate network validations delay (350ms) to ensure premium visual transitions
       await new Promise((resolve) => setTimeout(resolve, 350));
       
       addItem({
@@ -66,6 +84,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
       setOptimisticState('added');
       toggleCart();
 
+      // Automatically reset card add state after 1.5 seconds delay
       setTimeout(() => {
         startTransition(() => {
           setOptimisticState('idle');
@@ -84,7 +103,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
         aria-label={`View specifications and detailed information for ${product.enName}`}
         className="group relative flex flex-col overflow-hidden rounded-2xl border border-neutral-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#1b4f93]/20 hover:shadow-xl hover:shadow-[#1b4f93]/5 focus-visible:ring-2 focus-visible:ring-[#1b4f93] focus-visible:outline-hidden dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-[#1b4f93]/30 flex-1"
       >
-        {/* Badge container */}
+        {/* Discount & Stock circular badges container */}
         <div className="absolute top-5 left-5 z-10 flex flex-col gap-1.5">
           {showDiscount && (
             <span 
@@ -107,7 +126,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
           ) : null}
         </div>
 
-        {/* Product Image Gallery with Zoom */}
+        {/* Product Image Gallery container with hover Zoom */}
         <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-neutral-50 dark:bg-neutral-950">
           <Image
             src={imageUrl}
@@ -117,7 +136,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
             className="object-contain p-2 transition-transform duration-500 ease-out group-hover:scale-108"
             priority={false}
           />
-          {/* Quick View Hover Overlay */}
+          {/* Quick View Hover overlay mask */}
           <div className="absolute inset-0 bg-neutral-900/20 opacity-0 backdrop-blur-xs transition-opacity duration-300 group-hover:opacity-100 flex items-center justify-center gap-2">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-neutral-800 shadow-md transition-all duration-300 hover:scale-110 hover:bg-blue-600 hover:text-white dark:bg-neutral-800 dark:text-white dark:hover:bg-blue-500">
               <Eye className="h-5 w-5" aria-hidden="true" />
@@ -126,10 +145,10 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
           </div>
         </div>
 
-        {/* Product Information */}
+        {/* Product details and tags section */}
         <div className="mt-3 flex flex-1 flex-col justify-between">
           <div>
-            {/* Attributes short representation if available */}
+            {/* Attributes short metadata tag if available */}
             <div className="flex items-center justify-between text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               <span>{product.productAttributes?.[0]?.values?.[0]?.enName || 'Walton Plaza'}</span>
               <span className="flex items-center gap-0.5 text-amber-500 font-extrabold" aria-label={`Rating: ${getProductRatingValue(product).toFixed(1)} stars`}>
@@ -137,13 +156,13 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
               </span>
             </div>
 
-            {/* Title */}
+            {/* Title text */}
             <h3 className="mt-1 line-clamp-2 text-sm font-semibold tracking-tight text-neutral-800 group-hover:text-[#1b4f93] transition-colors duration-200 dark:text-neutral-100 dark:group-hover:text-blue-400">
               {product.enName}
             </h3>
           </div>
 
-          {/* Pricing & Cart Action */}
+          {/* Pricing & Add to Cart dynamic operations */}
           <div className="mt-4">
             <div className="flex items-baseline gap-2">
               <span className="text-base font-extrabold tracking-tight text-neutral-900 dark:text-white">
@@ -159,7 +178,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
               )}
             </div>
 
-            {/* Action Button using React 19 Optimistic state */}
+            {/* Action purchase button utilizing React 19 Optimistics */}
             <button
               onClick={handleAddToCart}
               disabled={isOutOfStock || optimisticState === 'adding'}
@@ -209,3 +228,4 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
     </article>
   );
 });
+

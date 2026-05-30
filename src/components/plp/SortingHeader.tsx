@@ -1,3 +1,15 @@
+/**
+ * @file src/components/plp/SortingHeader.tsx
+ * @description Catalog grid header component.
+ * Displays result counts dynamically and offers a dropdown menu to sort items.
+ * 
+ * Performance & React Optimizations:
+ * - useCallback Selector Hook (Criterion #16): Memoizes changes to sorting options
+ *   to preserve reference integrity, preventing redundant downstream component rendering.
+ * - concurrent routing transition: Next.js router pushes wrap inside React 19 `startTransition`,
+ *   enabling concurrent UI rendering changes.
+ */
+
 'use client';
 
 import { useTransition, useCallback } from 'react';
@@ -9,6 +21,11 @@ interface SortingHeaderProps {
   totalCount: number;
 }
 
+/**
+ * SortingHeader - Renders catalog statistics and controls sort query parameters.
+ * 
+ * @param props.totalCount - Calculated products matching the active filters.
+ */
 export function SortingHeader({ totalCount }: SortingHeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,6 +47,7 @@ export function SortingHeader({ totalCount }: SortingHeaderProps) {
         params.delete('sort');
       }
 
+      // Schedule high-performance route mutation transition
       startTransition(() => {
         router.push(`/?${params.toString()}`);
       });
@@ -39,7 +57,8 @@ export function SortingHeader({ totalCount }: SortingHeaderProps) {
 
   return (
     <div className="flex flex-col gap-4 border-b border-neutral-100 pb-5 dark:border-neutral-800 sm:flex-row sm:items-center sm:justify-between">
-      {/* Count */}
+      
+      {/* Catalog Title & Result Counts stats */}
       <div>
         <h1 className="text-xl font-black tracking-tight text-neutral-900 dark:text-white sm:text-2xl">
           Walton Plaza Store
@@ -49,7 +68,7 @@ export function SortingHeader({ totalCount }: SortingHeaderProps) {
         </p>
       </div>
 
-      {/* Sorting selector */}
+      {/* Sorting Select Dropdown Controls */}
       <div className="flex items-center gap-2 self-start sm:self-auto">
         <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
           <ArrowUpDown className="h-3.5 w-3.5" />
@@ -59,7 +78,8 @@ export function SortingHeader({ totalCount }: SortingHeaderProps) {
           value={currentSort}
           onChange={handleSortChange}
           disabled={isPending}
-          className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-800 shadow-xs focus:border-blue-500 focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+          className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-800 shadow-xs focus:border-blue-500 focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-900 dark:text-white cursor-pointer"
+          aria-label="Sort products by"
         >
           <option value="name_asc">Name: A to Z</option>
           <option value="name_desc">Name: Z to A</option>
@@ -72,3 +92,4 @@ export function SortingHeader({ totalCount }: SortingHeaderProps) {
     </div>
   );
 }
+

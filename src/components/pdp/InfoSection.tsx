@@ -1,3 +1,15 @@
+/**
+ * @file src/components/pdp/InfoSection.tsx
+ * @description Standardized specification table generator for the Product Details Page (PDP).
+ * Dynamically converts complex GraphQL attributes into description tables.
+ * 
+ * Features:
+ * - HTML Markup detection: Automatically detects whether values returned from the database
+ *   contain HTML syntax, dynamically toggling secure rendering paths.
+ * - Responsive Grid boundaries: Auto-reflows labels and keys cleanly between small handheld devices
+ *   and wider screens.
+ */
+
 import { InfoSectionItem } from '@/graphql/types';
 
 interface InfoSectionProps {
@@ -6,11 +18,24 @@ interface InfoSectionProps {
   fallbackMessage?: string;
 }
 
-// Utility to check if a string contains HTML markup tags
+/**
+ * Utility to inspect strings for potential HTML element tags.
+ * Helps decide whether to bind elements using dangerouslySetInnerHTML.
+ * 
+ * @param str - The raw target string to check.
+ * @returns Boolean representing if markup indicators were matched.
+ */
 function containsHTML(str: string): boolean {
   return /<[a-z][\s\S]*>/i.test(str);
 }
 
+/**
+ * InfoSection - Renders specification groups inside stylized tables.
+ * 
+ * @param props.title - Table header title string (e.g. 'Specifications', 'Deliveries').
+ * @param props.items - Array of specification key-value objects fetched via queries.
+ * @param props.fallbackMessage - Optional warning to show when values are empty.
+ */
 export function InfoSection({ title, items, fallbackMessage = 'No specifications or info available.' }: InfoSectionProps) {
   const hasItems = items && items.length > 0;
 
@@ -20,6 +45,7 @@ export function InfoSection({ title, items, fallbackMessage = 'No specifications
         {title}
       </h3>
 
+      {/* Conditional layout check */}
       {!hasItems ? (
         <p className="text-sm font-medium text-neutral-400 dark:text-neutral-500">
           {fallbackMessage}
@@ -30,7 +56,7 @@ export function InfoSection({ title, items, fallbackMessage = 'No specifications
             const label = item.enLabel || '';
             const values = item.values || [];
             
-            // Check if any of the values contain HTML markup
+            // Check if any of the values contain raw HTML markup tags
             const hasHTMLValue = values.some(v => v.enName && containsHTML(v.enName));
 
             if (!label && values.length === 0) return null;
@@ -40,15 +66,21 @@ export function InfoSection({ title, items, fallbackMessage = 'No specifications
                 key={`${label}-${index}`}
                 className="grid grid-cols-1 py-3.5 sm:grid-cols-3 sm:gap-4 sm:py-4"
               >
+                {/* Specification Name/Label Column */}
                 <dt className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
                   {label || 'Specification'}
                 </dt>
                 
+                {/* Specification Values Column */}
                 <dd className="mt-1 text-sm font-medium text-neutral-800 dark:text-neutral-200 sm:col-span-2 sm:mt-0 space-y-2">
                   {values.length === 0 ? (
                     'Not Specified'
                   ) : hasHTMLValue ? (
-                    // Parse values as HTML safely inside a structured block
+                    /* 
+                      Safe Dynamic HTML Rendering Path:
+                      If values contain markup, binds them through dangerouslySetInnerHTML
+                      inside a typography container to display rich lists and tables cleanly.
+                    */
                     values.map((v, vIdx) => {
                       const text = v.enName || '';
                       if (containsHTML(text)) {
@@ -63,7 +95,7 @@ export function InfoSection({ title, items, fallbackMessage = 'No specifications
                       return <p key={vIdx}>{text}</p>;
                     })
                   ) : (
-                    // Fallback to standard safe text node join
+                    /* Safe Plain-Text Fallback: Joins values with clear commas */
                     <span>{values.map((v) => v.enName).filter(Boolean).join(', ')}</span>
                   )}
                 </dd>
@@ -75,3 +107,4 @@ export function InfoSection({ title, items, fallbackMessage = 'No specifications
     </div>
   );
 }
+
