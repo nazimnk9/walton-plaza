@@ -1,18 +1,28 @@
+/**
+ * @file src/utils/category.ts
+ * @description Common category classification, rating generation, and SKU description utility helpers.
+ * Handles dynamic product classification, deterministic reviews calculations, and human-friendly variant naming.
+ */
+
 import { Product, ProductVariant } from '@/graphql/types';
 
 /**
  * Resolves a product's category dynamically based on its attributes and name.
+ * Inspects both explicit productAttributes metadata lists and fallback textual name descriptions.
+ * 
+ * @param product - A single Product object to inspect.
+ * @returns Classified category title string (e.g. 'Air Conditioner', 'Blender').
  */
 export function getProductCategory(product: Product): string {
   const attrs = product.productAttributes || [];
 
-  // Check attributes
+  // 1. Inspect explicit database metadata label tags first
   if (
     attrs.some(
       (a) =>
         a.enLabel.toLowerCase().includes('air conditioner') ||
         a.enLabel.toLowerCase().includes('cooling capacity')
-    )
+      )
   ) {
     return 'Air Conditioner';
   }
@@ -29,7 +39,7 @@ export function getProductCategory(product: Product): string {
     return 'Television';
   }
 
-  // Fallback to name inspection
+  // 2. Fallback: Parse common substrings directly inside the English title
   const name = product.enName.toLowerCase();
   if (name.includes('ac ') || name.includes('air conditioner') || name.includes('inverter ac')) {
     return 'Air Conditioner';
@@ -54,11 +64,20 @@ export function getProductCategory(product: Product): string {
  * Deterministically resolves a product rating value.
  * Utilizes the backend-supplied rating average if available;
  * otherwise calculates a stable, realistic rating based on the product UID.
+ * 
+ * Why hash-based? 
+ * Ensures the rating remains perfectly consistent for the same item across re-renders,
+ * avoiding visual jumpiness in the UI while satisfying a11y.
+ * 
+ * @param product - A single Product object.
+ * @returns Resolved numerical rating score between 4.0 and 5.0.
  */
 export function getProductRatingValue(product: Product): number {
   if (product.rating?.average !== null && product.rating?.average !== undefined) {
     return product.rating.average;
   }
+  
+  // Hash calculation derived from the unique string identifier (UID)
   let hash = 0;
   for (let i = 0; i < product.uid.length; i++) {
     hash = product.uid.charCodeAt(i) + ((hash << 5) - hash);
@@ -70,6 +89,11 @@ export function getProductRatingValue(product: Product): number {
 /**
  * Generates an intelligent, human-readable label for a product variant.
  * Prefers capacity (Tonnage/BTU for ACs, Liters for Ovens/Blenders), or colors if present.
+ * 
+ * @param variant - The ProductVariant configuration target.
+ * @param product - The parent Product containing meta descriptions.
+ * @param index - The loop index inside collections.
+ * @returns Human readable option description (e.g. "1.5 Ton (18,000 BTU)", "25 Liters").
  */
 export function getVariantLabel(variant: ProductVariant, product: Product, index: number): string {
   const posCode = variant.posItemCode || '';
@@ -99,3 +123,4 @@ export function getVariantLabel(variant: ProductVariant, product: Product, index
 
   return `Option ${index + 1}`;
 }
+
