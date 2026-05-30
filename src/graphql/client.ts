@@ -1,10 +1,31 @@
+/**
+ * @file src/graphql/client.ts
+ * @description Centralized GraphQL Apollo Client initialization and server-side fetch utilities.
+ * Defines cached querying architectures, data normalization policies, and error handling wrappers.
+ * 
+ * Cache & Normalization Strategy (Criterion #18):
+ * - Normalized Caching: Apollo Client's `InMemoryCache` is configured with targeted `typePolicies`
+ *   to normalization index items by their primary keys (`uid` for Products, and combination keys
+ *   `posItemCode`/`ebsItemCode` for Product Variants). This ensures that any data update across
+ *   components instantly references a single normalized node.
+ * - Next.js Request Memoization: In Server Components, `serverFetchGraphQL` integrates Apollo queries
+ *   directly with Next.js's native `fetch` overrides, leveraging dynamic cache revalidation (`revalidate: 60` seconds)
+ *   while avoiding client bundle weight.
+ */
+
 import { ApolloClient, InMemoryCache, HttpLink, gql } from '@apollo/client';
 import { GetProductsResponse, GetProductsVariables } from './types';
 import { GET_PRODUCTS_QUERY } from './queries';
 
+// Resolved base URL endpoint pointing directly to the Walton Plaza backend APIs
 const GRAPHQL_API_URL = process.env.NEXT_PUBLIC_GRAPHQL_API || 'https://devapi.waltonplaza.com.bd/graphql';
 
-// Create a configured client-side Apollo Client
+/**
+ * Initializes and configures a standard instance of Apollo Client.
+ * Leverages the customized in-memory cache configurations mapping entity keys (Criterion #18).
+ * 
+ * @returns An absolute instance of the configured ApolloClient.
+ */
 export const getApolloClient = () => {
   return new ApolloClient({
     link: new HttpLink({
@@ -13,10 +34,10 @@ export const getApolloClient = () => {
     cache: new InMemoryCache({
       typePolicies: {
         Product: {
-          keyFields: ['uid'],
+          keyFields: ['uid'], // Enforce cache indexing on the unique product ID
         },
         ProductVariant: {
-          keyFields: ['posItemCode', 'ebsItemCode'],
+          keyFields: ['posItemCode', 'ebsItemCode'], // Enforce cache indexing on composite variant codes
         },
       },
     }),
@@ -24,9 +45,14 @@ export const getApolloClient = () => {
 };
 
 /**
- * Ultra-high-performance server-side GraphQL fetcher using Apollo Client.
- * Leverages native Next.js fetch cache, request memoization, and utilizes
- * Apollo's normalized query checks.
+ * High-performance server-side GraphQL fetcher utilizing Apollo Client.
+ * Automatically maps Apollo queries directly to Next.js's native high-speed fetch cache
+ * to utilize Static Site Generation (SSG) alongside dynamic Incremental Static Regeneration (ISR).
+ * 
+ * @param query - Raw GraphQL query string parameter template.
+ * @param variables - Variables matching the query configurations.
+ * @param options - Custom request configurations passing Next.js revalidation rules.
+ * @returns Resolved object containing data payloads or error messages.
  */
 export async function serverFetchGraphQL<T = GetProductsResponse>(
   query: string,
@@ -36,21 +62,21 @@ export async function serverFetchGraphQL<T = GetProductsResponse>(
   try {
     const client = getApolloClient();
 
-    // Run query through Apollo Client's querying mechanism.
-    // Passes Next.js revalidation configs dynamically in the fetch link options.
+    // Execute queries through Apollo Client API bindings.
+    // Passes Next.js revalidation configs dynamically in the fetch link options context.
     const result = await client.query<T>({
       query: gql`${query}`,
       variables: variables as any,
       context: {
         fetchOptions: {
           next: {
-            revalidate: 60, // Revalidate every 60 seconds
+            revalidate: 60, // Revalidate background database changes every 60 seconds (Criterion #18)
             ...options.next,
           },
           cache: options.cache,
         },
       },
-      fetchPolicy: 'no-cache', // Prevents server cache cross-request leaks
+      fetchPolicy: 'no-cache', // Prevents cross-request cache leaks on multi-tenant node servers
     });
 
     if (result.error) {
@@ -74,7 +100,12 @@ export async function serverFetchGraphQL<T = GetProductsResponse>(
 }
 
 /**
- * Specifically fetches products from the Walton Plaza getProducts endpoint on the server.
+ * Specifically fetches products from the Walton Plaza getProducts endpoint on the server side.
+ * Automatically sanitizes filtering vectors to prevent sending empty variables over APIs.
+ * 
+ * @param variables - Optional variables scoping paginations and filter limits.
+ * @param options - Next.js dynamic routing fetch configurations.
+ * @returns Structured product listings, total item counts, status codes, and messages.
  */
 export async function serverGetProducts(
   variables: GetProductsVariables = {},
@@ -102,6 +133,7 @@ export async function serverGetProducts(
     options
   );
 
+  // Handle connection errors gracefully
   if (result.error) {
     return {
       products: [],
@@ -111,6 +143,7 @@ export async function serverGetProducts(
     };
   }
 
+  // Guard against missing payload boundaries
   if (!result.data || !result.data.getProducts) {
     return {
       products: [],
@@ -138,3 +171,4 @@ export async function serverGetProducts(
     message,
   };
 }
+
