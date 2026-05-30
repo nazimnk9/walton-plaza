@@ -1,3 +1,17 @@
+/**
+ * @file src/app/products/[uid]/page.tsx
+ * @description Product Details Page (PDP) dynamic Server Component.
+ * Fetches specific product data on the server based on the dynamic `[uid]` route parameter.
+ * 
+ * Features & Design Strategy:
+ * - Dual Resolution (Criterion #11): Attempts to fetch the product by either its unique identifier (`uid`)
+ *   or its Point of Sale (`posItemCode`).
+ * - Dynamic Metadata Generation: Runs a server-side resolver before rendering to dynamically set
+ *   indexable page headers (title, meta description) tailored specifically to the product.
+ * - Performance Isolation: Left and right layout columns separate static content from highly dynamic,
+ *   state-driven elements like `<ImageGallery />`, `<VariantSelector />`, and `<PDPTabs />`.
+ */
+
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
@@ -12,7 +26,13 @@ interface PDPPageProps {
   }>;
 }
 
-// Utility resolver to find product by either UID or POS Item Code dynamically (Criterion #11)
+/**
+ * Utility resolver to find a product by either its UID or POS Item Code dynamically (Criterion #11).
+ * First attempts to match by UID. If none is returned, queries by POS code as a fallback.
+ * 
+ * @param routeParam - The dynamic route parameter string representing either the UID or POS Code.
+ * @returns An object containing the matched product, API status code, and raw message.
+ */
 async function resolveProduct(routeParam: string) {
   // 1. Attempt query using routeParam as uid
   let { products, statusCode, message } = await serverGetProducts({
@@ -38,12 +58,16 @@ async function resolveProduct(routeParam: string) {
   return { product, statusCode, message };
 }
 
-// Generate Dynamic SEO Metadata for Walton Plaza PDP
+/**
+ * Generate Dynamic SEO Metadata for Walton Plaza PDP.
+ * Crawlers leverage this static declaration to fetch localized meta tags.
+ */
 export async function generateMetadata(props: PDPPageProps): Promise<Metadata> {
   const { uid } = await props.params;
 
   const { product } = await resolveProduct(uid);
 
+  // Fallback metadata if the product doesn't exist
   if (!product) {
     return {
       title: 'Product Not Found | Walton Plaza',
@@ -51,19 +75,23 @@ export async function generateMetadata(props: PDPPageProps): Promise<Metadata> {
     };
   }
 
+  // Construct highly indexable SEO metadata tags dynamically
   return {
     title: `${product.enName} | Walton Plaza`,
     description: `Purchase ${product.enName} original model on Walton Plaza. Explore top performance specifications, customer warranty, and fast home delivery.`,
   };
 }
 
+/**
+ * ProductDetailPage - Main Server Component rendering the specific product's page.
+ */
 export default async function ProductDetailPage(props: PDPPageProps) {
   const { uid } = await props.params;
 
-  // Resolve the product by either UID or POS Item Code
+  // Resolve the product by either UID or POS Item Code dynamically on the server
   const { product, statusCode, message } = await resolveProduct(uid);
 
-  // Handle network/connection failure gracefully
+  // Handle network/connection failure gracefully by presenting an elegant fallback card
   if (statusCode !== 200) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
@@ -85,7 +113,7 @@ export default async function ProductDetailPage(props: PDPPageProps) {
     );
   }
 
-  // Handle empty product match
+  // Handle empty product match elegantly
   if (!product) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
@@ -107,7 +135,7 @@ export default async function ProductDetailPage(props: PDPPageProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Navigation Breadcrumb */}
+      {/* Navigation Breadcrumb back to home */}
       <div className="mb-6">
         <Link
           href="/"
@@ -118,14 +146,20 @@ export default async function ProductDetailPage(props: PDPPageProps) {
         </Link>
       </div>
 
-      {/* Main product setup */}
+      {/* Main product presentation layout */}
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:gap-12">
-        {/* Left Column: Image Gallery */}
+        {/* 
+          Left Column: Interactive Image Gallery.
+          Handles user image toggling, zoom previews, and carousel swipes on mobile.
+        */}
         <div>
           <ImageGallery images={product.images} productName={product.enName} />
         </div>
 
-        {/* Right Column: Title, Variant Selectors, Buy actions */}
+        {/* 
+          Right Column: Title, Variant Selectors, and Cart add buttons.
+          Deals with highly volatile states like color/storage selectors, price calculations, and stock models.
+        */}
         <div className="flex flex-col justify-start">
           <div>
             <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-500/5 px-2.5 py-1 rounded-full dark:text-blue-400 dark:bg-blue-500/10">
@@ -139,13 +173,17 @@ export default async function ProductDetailPage(props: PDPPageProps) {
             </p>
           </div>
 
+          {/* Handles interactive variants selection and Zustand cart operations */}
           <div className="mt-8">
             <VariantSelector product={product} />
           </div>
         </div>
       </div>
 
-      {/* Specification Tabs at the Bottom */}
+      {/* 
+        Specification Tabs at the Bottom:
+        Renders rich text attributes inside detailed tabs (Specs, Deliveries, and Support services).
+      */}
       <div className="mt-16 border-t border-neutral-100 pt-10 dark:border-neutral-800">
         <h2 className="text-lg font-black tracking-tight text-neutral-950 dark:text-white mb-6">
           Product Details &amp; Specifications
@@ -155,3 +193,4 @@ export default async function ProductDetailPage(props: PDPPageProps) {
     </div>
   );
 }
+
